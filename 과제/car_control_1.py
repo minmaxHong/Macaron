@@ -28,6 +28,7 @@ from pygame.locals import *
 import numpy as np
 import time
 import math
+import sys
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -45,10 +46,40 @@ clock = pygame.time.Clock()
 rate = 100
 
 # 목표 좌표
-GOAL = [[300, 300], # 첫번째 목표
-        [425, 425], # 두번째 목표
+GOAL = [[250, 370], # 첫번째 목표
+        [110, 325], # 두번째 목표
         [75, 75]]   # 마지막 목표는 출발점
 
+def norm_steer(steer):
+    while steer > 180:
+        steer -= 2.0 * 180
+    
+    while steer < -180:
+        steer += 2.0 * 180
+    
+    return steer
+        
+# 벡터 정규화
+def norm_vector(vector):
+    magnitude = np.sqrt(vector[0] ** 2 + vector[1] ** 2)
+    
+    if magnitude != 0:
+        normalized_vector = vector / magnitude
+        return normalized_vector
+    
+    else:
+        return vector    
+
+# 두 벡터 사잇각 구하기
+def vector_angle(goal_vector, heading_vector):
+    a = goal_vector[0] - heading_vector[0]
+    b = goal_vector[1] - heading_vector[1]
+    
+    theta = np.arctan2(a, b)
+    theta = np.degrees(theta)
+    
+    return theta
+    
 
 class Car:
     def __init__(self, initial_location):
@@ -69,7 +100,7 @@ class Car:
         self.predict_time = 0.01
 
         # ↓ ↓ ↓ ↓ ↓ ↓ init 에서 활용하고 싶은 인스턴스 변수가 있을 시 이곳에 작성 ↓ ↓ ↓ ↓ ↓ ↓
-        
+        self.step = 0
         # ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑
 
     # noinspection PyMethodMayBeStatic
@@ -106,16 +137,62 @@ class Car:
         pygame.draw.polygon(screen, RED, [corner1, corner2, corner3, corner4])
 
     # set_motor_value 함수 내에서 자유롭게 작성
+    
     def set_motor_value(self, count):
         self.speed = 150
         
-        # == 첫번째 목표, 두번째 목표== 
-        first_goal = GOAL[0]
+        # 현재 위치 값
+        loc = np.array([self.x, self.y])
+        loc_int = loc.astype(int)
         
-        fr_target = [first_goal[0] - self.x, first_goal[1] - self.y]
-        fr_angle = np.arctan2(fr_target[1], fr_target[0])
-        self.steer = -fr_angle
-
+        # heading값
+        heading_x = cos(self.heading)
+        heading_y = sin(self.heading)
+        heading_vector = np.array([heading_x, heading_y])
+        
+        norm_heading_vector = norm_vector(heading_vector)
+        
+        # 첫번째 목표 vector
+        fr_x = GOAL[0][0] - self.x
+        fr_y = GOAL[0][1] - self.y
+        fr_vector = np.array([fr_x, fr_y])
+        
+        norm_fr_vector = norm_vector(fr_vector)
+        
+        fr_steer = vector_angle(norm_fr_vector, norm_heading_vector)     
+        if self.step == 0:
+            self.steer = norm_steer(fr_steer)
+            if np.allclose(loc_int, GOAL[0], atol=1) == True:
+                time.sleep(1)
+                self.step = 1
+        
+        # 두번쟤 목표 vector
+        sec_x = GOAL[1][0] - self.x
+        sec_y = GOAL[1][1] - self.y
+        sec_vector = np.array([sec_x, sec_y])
+        
+        norm_sec_vector = norm_vector(sec_vector)
+        sec_steer = vector_angle(norm_sec_vector, norm_heading_vector)
+        
+        if self.step == 1:
+            self.steer = norm_steer(sec_steer)
+            if np.allclose(loc_int, GOAL[1], atol=1) == True:
+                time.sleep(1)
+                self.step = 2
+        
+        # 마지막 목표 vector
+        thr_x = GOAL[2][0] - self.x
+        thr_y = GOAL[2][1] - self.y
+        thr_vector = np.array([thr_x, thr_y])
+        
+        norm_thr_vector = norm_vector(thr_vector)
+        thr_steer = vector_angle(norm_thr_vector, norm_heading_vector)
+        
+        if self.step == 2:
+            self.steer = norm_steer(-thr_steer)
+            if np.allclose(loc_int, GOAL[2], atol=1) == True:
+                time.sleep(1)
+                sys.exit()
 
 def main():
     car = Car([GOAL[2][0], GOAL[2][1]])
